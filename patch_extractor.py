@@ -1,13 +1,14 @@
 """
 @Author: Nicolo' Bonettini
 @Author: Luca Bondi
+@Author: Francesco Picetti
 """
 import random
 import numpy as np
 from skimage.util import view_as_windows, view_as_blocks
 
 
-## Score functions ---
+# Score functions ---
 
 def mid_intensity_high_texture(in_content):
     """
@@ -35,137 +36,7 @@ def mid_intensity_high_texture(in_content):
     return score
 
 
-def patch_extractor(in_content, dim, **kwargs):
-    """
-    N-dimensional patch extractor
-    Args:
-    :param in_content : ndarray
-        the content to process as a numpy array of ndim dimensions
 
-    :param dim : tuple
-        patch_array dimensions as a tuple of ndim elements
-
-    Named args:
-    :param offset : tuple
-        the offsets along each axis as a tuple of ndim elements
-
-    :param stride : tuple
-        the stride of each axis as a tuple of ndim elements
-
-    :param rand : bool
-        randomize patch_array order. Mutually exclusive with function_handler
-
-    :param function : function
-        patch quality function handler. Mutually exclusive with rand
-
-    :param threshold: float
-        minimum quality threshold
-
-    :param num : int
-        maximum number of returned patch_array.  Mutually exclusive with indexes
-
-    :param indexes : list|ndarray
-        explicitly return corresponding patch indexes (function_handler or C order used to index patch_array).
-        Mutually exclusive with num
-
-    :return ndarray: patch_array
-        array of patch_array
-        if rand==False and function_handler==None and num==None and indexes==None:
-            patch_array.ndim = 2 * in_content.ndim
-        else:
-            patch_array.ndim = 1 + in_content.ndim
-    """
-
-    # Arguments parser ---
-    if not isinstance(in_content, np.ndarray):
-        raise ValueError('in_content must be of type: ' + str(np.ndarray))
-
-    ndim = in_content.ndim
-
-    if not isinstance(dim, tuple):
-        raise ValueError('dim must be a tuple')
-    if len(dim) != ndim:
-        raise ValueError('dim must a tuple of length {:d}'.format(ndim))
-
-    offset = kwargs.pop('offset', tuple([0] * ndim))
-    if not isinstance(offset, tuple):
-        raise ValueError('offset must be a tuple')
-    if len(offset) != ndim:
-        raise ValueError('offset must a tuple of length {:d}'.format(ndim))
-
-    stride = kwargs.pop('stride', dim)
-    if not isinstance(stride, tuple):
-        raise ValueError('stride must be a tuple')
-    if len(stride) != ndim:
-        raise ValueError('stride must a tuple of length {:d}'.format(ndim))
-
-    if 'rand' in kwargs and 'function' in kwargs:
-        raise ValueError('rand and function cannot be set at the same time')
-
-    rand = kwargs.pop('rand', False)
-    if not isinstance(rand, bool):
-        raise ValueError('rand must be a boolean')
-
-    function_handler = kwargs.pop('function', None)
-    if function_handler is not None and not callable(function_handler):
-        raise ValueError('function must be a function handler')
-
-    threshold = kwargs.pop('threshold', 0.0)
-    if not isinstance(threshold, float):
-        raise ValueError('threshold must be a float')
-
-    if 'num' in kwargs and 'indexes' in kwargs:
-        raise ValueError('num and indexes cannot be set at the same time')
-
-    num = kwargs.pop('num', None)
-    if num is not None and not isinstance(num, int):
-        raise ValueError('num must be an int')
-
-    indexes = kwargs.pop('indexes', None)
-    if indexes is not None and not isinstance(indexes, list) and not isinstance(indexes, np.ndarray):
-        raise ValueError('indexes must be an list or a 1d ndarray')
-    if indexes is not None:
-        indexes = np.array(indexes).flatten()
-
-    # Offset ---
-    for dim_idx, dim_offset in enumerate(offset):
-        dim_max = in_content.shape[dim_idx]
-        in_content = in_content.take(range(dim_offset, dim_max), axis=dim_idx)
-
-    # Patch list ---
-    if dim == stride:
-        in_content_crop = in_content
-        for dim_idx in range(ndim):
-            dim_max = (in_content.shape[dim_idx] // dim[dim_idx]) * dim[dim_idx]
-            in_content_crop = in_content_crop.take(range(0, dim_max), axis=dim_idx)
-        patch_array = view_as_blocks(in_content_crop, dim)
-    else:
-        patch_array = view_as_windows(in_content, dim, stride)
-
-    patch_array = np.ascontiguousarray(patch_array)
-
-    # Evaluate patch_array or rand sort ---
-    if rand:
-        patch_array.shape = (-1,) + dim
-        random.shuffle(patch_array)
-    else:
-        if function_handler is not None:
-            patch_array.shape = (-1,) + dim
-            patch_scores = np.asarray(list(map(function_handler, patch_array)))
-            sort_idxs = np.argsort(patch_scores)[::-1]
-            patch_scores = patch_scores[sort_idxs]
-            patch_array = patch_array[sort_idxs]
-            patch_array = patch_array[patch_scores >= threshold]
-
-    if num is not None:
-        patch_array.shape = (-1,) + dim
-        patch_array = patch_array[:num]
-
-    if indexes is not None:
-        patch_array.shape = (-1,) + dim
-        patch_array = patch_array[indexes]
-
-    return patch_array
 
 
 def count_patches(in_size, patch_size, patch_stride):
@@ -183,7 +54,6 @@ def count_patches(in_size, patch_size, patch_stride):
 
 def patch2image(patch_array, patch_stride, image_shape):
     """
-    @Author: Francesco Picetti
     Reconstruct the N-dim image from the patch_array that has been extracted previously
     :param patch_array: array of patches as output of patch_extractor
     :param patch_stride: stride used to extract patches
@@ -211,7 +81,6 @@ def patch2image(patch_array, patch_stride, image_shape):
     image_shape_computed = tuple((np.array(patch_idx) - 1) * np.array(patch_stride) + np.array(patch_shape))
     if not image_shape == image_shape_computed:
         raise ValueError('There is something wrong with the dimensions!')
-
 
     if ndim > 4:
         raise ValueError('For now, it works only in 4D, sorry!')
@@ -258,6 +127,156 @@ def patch_extractor_call(args):
                            **args)
 
 
+class PatchExtractor:
+
+    def __init__(self, dim, offset=None, stride=None, rand=None, function=None, threshold=None,
+                 num=None, indexes=None):
+
+        """
+        N-dimensional patch extractor
+        Args:
+        :param in_content : ndarray
+            the content to process as a numpy array of ndim dimensions
+
+        :param dim : tuple
+            patch_array dimensions as a tuple of ndim elements
+
+        Named args:
+        :param offset : tuple
+            the offsets along each axis as a tuple of ndim elements
+
+        :param stride : tuple
+            the stride of each axis as a tuple of ndim elements
+
+        :param rand : bool
+            randomize patch_array order. Mutually exclusive with function_handler
+
+        :param function : function
+            patch quality function handler. Mutually exclusive with rand
+
+        :param threshold: float
+            minimum quality threshold
+
+        :param num : int
+            maximum number of returned patch_array.  Mutually exclusive with indexes
+
+        :param indexes : list|ndarray
+            explicitly return corresponding patch indexes (function_handler or C order used to index patch_array).
+            Mutually exclusive with num
+
+        :return ndarray: patch_array
+            array of patch_array
+            if rand==False and function_handler==None and num==None and indexes==None:
+                patch_array.ndim = 2 * in_content.ndim
+            else:
+                patch_array.ndim = 1 + in_content.ndim
+        """
+
+        # Arguments parser ---
+        if not isinstance(dim, tuple):
+            raise ValueError('dim must be a tuple')
+        self.dim = dim
+
+        ndim = len(dim)
+        self.ndim = ndim
+
+        if offset is None:
+            offset = tuple([0] * ndim)
+        if not isinstance(offset, tuple):
+            raise ValueError('offset must be a tuple')
+        if len(offset) != ndim:
+            raise ValueError('offset must a tuple of length {:d}'.format(ndim))
+        self.offset = offset
+
+        if stride is None:
+            stride = dim
+        if not isinstance(stride, tuple):
+            raise ValueError('stride must be a tuple')
+        if len(stride) != ndim:
+            raise ValueError('stride must a tuple of length {:d}'.format(ndim))
+        self.stride = stride
+
+        if rand is not None and function is not None:
+            raise ValueError('rand and function cannot be set at the same time')
+
+        if rand is None:
+            rand = False
+        if not isinstance(rand, bool):
+            raise ValueError('rand must be a boolean')
+        self.rand = rand
+
+        if function is not None and not callable(function):
+            raise ValueError('function must be a function handler')
+        self.function_handler = function
+
+        if threshold is None:
+            threshold = 0.0
+        if not isinstance(threshold, float):
+            raise ValueError('threshold must be a float')
+        self.threshold = threshold
+
+        if num is not None and indexes is not None:
+            raise ValueError('num and indexes cannot be set at the same time')
+
+        if num is not None and not isinstance(num, int):
+            raise ValueError('num must be an int')
+        self.num = num
+
+        if indexes is not None and not isinstance(indexes, list) and not isinstance(indexes, np.ndarray):
+            raise ValueError('indexes must be an list or a 1d ndarray')
+        if indexes is not None:
+            indexes = np.array(indexes).flatten()
+        self.indexes = indexes
+
+    def patch_extractor(self, in_content):
+
+        if not isinstance(in_content, np.ndarray):
+            raise ValueError('in_content must be of type: ' + str(np.ndarray))
+
+        if in_content.ndim != self.ndim:
+            raise ValueError('in_content shape must a tuple of length {:d}'.format(self.ndim))
+
+        # Offset ---
+        for dim_idx, dim_offset in enumerate(self.offset):
+            dim_max = in_content.shape[dim_idx]
+            in_content = in_content.take(range(dim_offset, dim_max), axis=dim_idx)
+
+        # Patch list ---
+        if self.dim == self.stride:
+            in_content_crop = in_content
+            for dim_idx in range(self.ndim):
+                dim_max = (in_content.shape[dim_idx] // self.dim[dim_idx]) * self.dim[dim_idx]
+                in_content_crop = in_content_crop.take(range(0, dim_max), axis=dim_idx)
+            patch_array = view_as_blocks(in_content_crop, self.dim)
+        else:
+            patch_array = view_as_windows(in_content, self.dim, self.stride)
+
+        patch_array = np.ascontiguousarray(patch_array)
+
+        # Evaluate patch_array or rand sort ---
+        if self.rand:
+            patch_array.shape = (-1,) + self.dim
+            random.shuffle(patch_array)
+        else:
+            if self.function_handler is not None:
+                patch_array.shape = (-1,) + self.dim
+                patch_scores = np.asarray(list(map(self.function_handler, patch_array)))
+                sort_idxs = np.argsort(patch_scores)[::-1]
+                patch_scores = patch_scores[sort_idxs]
+                patch_array = patch_array[sort_idxs]
+                patch_array = patch_array[patch_scores >= self.threshold]
+
+        if self.num is not None:
+            patch_array.shape = (-1,) + self.dim
+            patch_array = patch_array[:self.num]
+
+        if self.indexes is not None:
+            patch_array.shape = (-1,) + self.dim
+            patch_array = patch_array[self.indexes]
+
+        return patch_array
+
+
 def main():
     in_shape = (25, 640, 480, 3)
     dim = (7, 120, 120, 3)
@@ -265,14 +284,15 @@ def main():
     offset = (1, 0, 0, 0)
     in_content = np.random.randint(256, size=in_shape).astype(np.uint8)
 
-    args = {'in_content': in_content,
-            'dim': dim,
-            'offset': offset,
-            'stride': stride,
-            }
+    # args = {'in_content': in_content,
+    #         'dim': dim,
+    #         'offset': offset,
+    #         'stride': stride,
+    #         }
 
-    patch_array = patch_extractor_call(args)
-
+    # patch_array = patch_extractor_call(args)
+    pe = PatchExtractor(dim)
+    patch_array = pe.patch_extractor(in_content)
     print('patch_array.shape = ' + str(patch_array.shape))
 
 
