@@ -35,6 +35,7 @@ def mid_intensity_high_texture(in_content):
     score = mean_std_weight * ch_mean_score + (1 - mean_std_weight) * ch_std_score
     return score
 
+
 def count_patches(in_size, patch_size, patch_stride):
     """
     Compute the number of patches
@@ -46,6 +47,7 @@ def count_patches(in_size, patch_size, patch_stride):
     win_indices_shape = (((np.array(in_size) - np.array(patch_size))
                           // np.array(patch_stride)) + 1)
     return int(np.prod(win_indices_shape))
+
 
 class PatchExtractor:
 
