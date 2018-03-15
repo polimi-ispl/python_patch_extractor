@@ -35,10 +35,6 @@ def mid_intensity_high_texture(in_content):
     score = mean_std_weight * ch_mean_score + (1 - mean_std_weight) * ch_std_score
     return score
 
-
-
-
-
 def count_patches(in_size, patch_size, patch_stride):
     """
     Compute the number of patches
@@ -50,82 +46,6 @@ def count_patches(in_size, patch_size, patch_stride):
     win_indices_shape = (((np.array(in_size) - np.array(patch_size))
                           // np.array(patch_stride)) + 1)
     return int(np.prod(win_indices_shape))
-
-
-def patch2image(patch_array, patch_stride, image_shape):
-    """
-    Reconstruct the N-dim image from the patch_array that has been extracted previously
-    :param patch_array: array of patches as output of patch_extractor
-    :param patch_stride: stride used to extract patches
-    :param image_shape: shape of the image to be reconstructed
-    :return:
-    """
-    # Arguments parser ---
-    if not isinstance(patch_array, np.ndarray):
-        raise ValueError('patch_array must be of type: ' + str(np.ndarray))
-
-    ndim = patch_array.ndim // 2
-
-    if not isinstance(patch_stride, tuple):
-        raise ValueError('patch_stride must be a tuple')
-    if len(patch_stride) != ndim:
-        raise ValueError('patch_stride must be a tuple of length {:d}'.format(ndim))
-
-    if not isinstance(image_shape, tuple):
-        raise ValueError('patch_idx must be a tuple')
-    if len(image_shape) != ndim:
-        raise ValueError('patch_idx must be a tuple of length {:d}'.format(ndim))
-
-    patch_shape = patch_array.shape[-ndim:]
-    patch_idx = patch_array.shape[:ndim]
-    image_shape_computed = tuple((np.array(patch_idx) - 1) * np.array(patch_stride) + np.array(patch_shape))
-    if not image_shape == image_shape_computed:
-        raise ValueError('There is something wrong with the dimensions!')
-
-    if ndim > 4:
-        raise ValueError('For now, it works only in 4D, sorry!')
-    numpatches = count_patches(image_shape, patch_shape, patch_stride)
-    patch_array_unwrapped = patch_array.reshape(numpatches, *patch_shape)
-    image_recon = np.zeros(image_shape)
-    norm_mask = np.zeros(image_shape)
-    counter = 0
-
-    for h in np.arange(0, image_shape[0] - patch_shape[0] + 1, patch_stride[0]):
-        if ndim > 1:
-            for i in np.arange(0, image_shape[1] - patch_shape[1] + 1, patch_stride[1]):
-                if ndim > 2:
-                    for j in np.arange(0, image_shape[2] - patch_shape[2] + 1, patch_stride[2]):
-                        if ndim > 3:
-                            for k in np.arange(0, image_shape[3] - patch_shape[3] + 1, patch_stride[3]):
-                                image_recon[h:h + patch_shape[0], i:i + patch_shape[1], j:j + patch_shape[2], k:k + patch_shape[3]] += patch_array_unwrapped[counter, :, :, :, :]
-                                norm_mask[h:h + patch_shape[0], i:i + patch_shape[1], j:j + patch_shape[2], k:k + patch_shape[3]] += 1
-                                counter += 1
-                        else:
-                            image_recon[h:h + patch_shape[0], i:i + patch_shape[1], j:j + patch_shape[2]] += patch_array_unwrapped[counter, :, :, :]
-                            norm_mask[h:h + patch_shape[0], i:i + patch_shape[1], j:j + patch_shape[2]] += 1
-                            counter += 1
-                else:
-                    image_recon[h:h + patch_shape[0], i:i + patch_shape[1]] += patch_array_unwrapped[counter, :, :]
-                    norm_mask[h:h + patch_shape[0], i:i + patch_shape[1]] += 1
-                    counter += 1
-        else:
-            image_recon[h:h + patch_shape[0]] += patch_array_unwrapped[counter, :]
-            norm_mask[h:h + patch_shape[0]] += 1
-            counter += 1
-
-    image_recon /= norm_mask
-
-    return image_recon
-
-
-def patch_extractor_call(args):
-    in_content = args.pop('in_content')
-    dim = args.pop('dim')
-
-    return patch_extractor(in_content,
-                           dim,
-                           **args)
-
 
 class PatchExtractor:
 
@@ -228,6 +148,9 @@ class PatchExtractor:
             indexes = np.array(indexes).flatten()
         self.indexes = indexes
 
+        self.in_content_original_shape = None
+        self.in_content_cropped_shape = None
+
     def patch_extractor(self, in_content):
 
         if not isinstance(in_content, np.ndarray):
@@ -235,6 +158,8 @@ class PatchExtractor:
 
         if in_content.ndim != self.ndim:
             raise ValueError('in_content shape must a tuple of length {:d}'.format(self.ndim))
+
+        self.in_content_original_shape = in_content.shape
 
         # Offset ---
         for dim_idx, dim_offset in enumerate(self.offset):
@@ -247,6 +172,7 @@ class PatchExtractor:
             for dim_idx in range(self.ndim):
                 dim_max = (in_content.shape[dim_idx] // self.dim[dim_idx]) * self.dim[dim_idx]
                 in_content_crop = in_content_crop.take(range(0, dim_max), axis=dim_idx)
+            self.in_content_cropped_shape = in_content_crop.shape
             patch_array = view_as_blocks(in_content_crop, self.dim)
         else:
             patch_array = view_as_windows(in_content, self.dim, self.stride)
@@ -276,14 +202,90 @@ class PatchExtractor:
 
         return patch_array
 
+    def patch_extractor_call(self, args):  # TODO: verify
+        in_content = args.pop('in_content')
+        dim = args.pop('dim')
+
+        return self.patch_extractor(in_content)
+
+    def patch2image(self, patch_array):
+        """
+        Reconstruct the N-dim image from the patch_array that has been extracted previously
+        :param patch_array: array of patches as output of patch_extractor
+        :param patch_stride: stride used to extract patches
+        :param image_shape: shape of the image to be reconstructed
+        :return:
+        """
+        # Arguments parser ---
+        if not isinstance(patch_array, np.ndarray):
+            raise ValueError('patch_array must be of type: ' + str(np.ndarray))
+
+        ndim = patch_array.ndim // 2
+
+        # if not isinstance(patch_stride, tuple):
+        #     raise ValueError('patch_stride must be a tuple')
+        # if len(patch_stride) != ndim:
+        #     raise ValueError('patch_stride must be a tuple of length {:d}'.format(ndim))
+        #
+        # if not isinstance(image_shape, tuple):
+        #     raise ValueError('patch_idx must be a tuple')
+        # if len(image_shape) != ndim:
+        #     raise ValueError('patch_idx must be a tuple of length {:d}'.format(ndim))
+
+        patch_stride = self.stride
+        image_shape = self.in_content_cropped_shape
+
+        patch_shape = patch_array.shape[-ndim:]
+        patch_idx = patch_array.shape[:ndim]
+        image_shape_computed = tuple((np.array(patch_idx) - 1) * np.array(patch_stride) + np.array(patch_shape))
+        if not image_shape == image_shape_computed:
+            raise ValueError('There is something wrong with the dimensions!')
+
+        if ndim > 4:
+            raise ValueError('For now, it works only in 4D, sorry!')
+        numpatches = count_patches(image_shape, patch_shape, patch_stride)
+        patch_array_unwrapped = patch_array.reshape(numpatches, *patch_shape)
+        image_recon = np.zeros(image_shape)
+        norm_mask = np.zeros(image_shape)
+        counter = 0
+
+        for h in np.arange(0, image_shape[0] - patch_shape[0] + 1, patch_stride[0]):
+            if ndim > 1:
+                for i in np.arange(0, image_shape[1] - patch_shape[1] + 1, patch_stride[1]):
+                    if ndim > 2:
+                        for j in np.arange(0, image_shape[2] - patch_shape[2] + 1, patch_stride[2]):
+                            if ndim > 3:
+                                for k in np.arange(0, image_shape[3] - patch_shape[3] + 1, patch_stride[3]):
+                                    image_recon[h:h + patch_shape[0], i:i + patch_shape[1], j:j + patch_shape[2],
+                                    k:k + patch_shape[3]] += patch_array_unwrapped[counter, :, :, :, :]
+                                    norm_mask[h:h + patch_shape[0], i:i + patch_shape[1], j:j + patch_shape[2],
+                                    k:k + patch_shape[3]] += 1
+                                    counter += 1
+                            else:
+                                image_recon[h:h + patch_shape[0], i:i + patch_shape[1],
+                                j:j + patch_shape[2]] += patch_array_unwrapped[counter, :, :, :]
+                                norm_mask[h:h + patch_shape[0], i:i + patch_shape[1], j:j + patch_shape[2]] += 1
+                                counter += 1
+                    else:
+                        image_recon[h:h + patch_shape[0], i:i + patch_shape[1]] += patch_array_unwrapped[counter, :, :]
+                        norm_mask[h:h + patch_shape[0], i:i + patch_shape[1]] += 1
+                        counter += 1
+            else:
+                image_recon[h:h + patch_shape[0]] += patch_array_unwrapped[counter, :]
+                norm_mask[h:h + patch_shape[0]] += 1
+                counter += 1
+
+        image_recon /= norm_mask
+
+        return image_recon
+
 
 def main():
-    in_shape = (25, 640, 480, 3)
-    dim = (7, 120, 120, 3)
+    in_shape = (644, 481, 3)
+    dim = (120, 120, 3)
     stride = (7, 90, 90, 3)
     offset = (1, 0, 0, 0)
     in_content = np.random.randint(256, size=in_shape).astype(np.uint8)
-
     # args = {'in_content': in_content,
     #         'dim': dim,
     #         'offset': offset,
@@ -294,6 +296,8 @@ def main():
     pe = PatchExtractor(dim)
     patch_array = pe.patch_extractor(in_content)
     print('patch_array.shape = ' + str(patch_array.shape))
+    img_recon = pe.patch2image(patch_array)
+    print('img_recon.shape = ' + str(img_recon.shape))
 
 
 if __name__ == "__main__":
