@@ -214,8 +214,6 @@ class PatchExtractor:
         """
         Reconstruct the N-dim image from the patch_array that has been extracted previously
         :param patch_array: array of patches as output of patch_extractor
-        :param patch_stride: stride used to extract patches
-        :param image_shape: shape of the image to be reconstructed
         :return:
         """
         # Arguments parser ---
