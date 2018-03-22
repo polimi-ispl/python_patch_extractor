@@ -153,7 +153,7 @@ class PatchExtractor:
         self.in_content_original_shape = None
         self.in_content_cropped_shape = None
 
-    def patch_extractor(self, in_content):
+    def extract(self, in_content):
 
         if not isinstance(in_content, np.ndarray):
             raise ValueError('in_content must be of type: ' + str(np.ndarray))
@@ -204,13 +204,13 @@ class PatchExtractor:
 
         return patch_array
 
-    def patch_extractor_call(self, args):  # TODO: verify
+    def extract_call(self, args):  # TODO: verify
         in_content = args.pop('in_content')
         dim = args.pop('dim')
 
-        return self.patch_extractor(in_content)
+        return self.extract(in_content)
 
-    def patch2image(self, patch_array):
+    def reconstruct(self, patch_array):
         """
         Reconstruct the N-dim image from the patch_array that has been extracted previously
         :param patch_array: array of patches as output of patch_extractor
@@ -294,9 +294,9 @@ def main():
 
     # patch_array = patch_extractor_call(args)
     pe = PatchExtractor(dim)
-    patch_array = pe.patch_extractor(in_content)
+    patch_array = pe.extract(in_content)
     print('patch_array.shape = ' + str(patch_array.shape))
-    img_recon = pe.patch2image(patch_array)
+    img_recon = pe.reconstruct(patch_array)
     print('img_recon.shape = ' + str(img_recon.shape))
 
 
