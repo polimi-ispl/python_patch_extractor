@@ -154,7 +154,6 @@ class PatchExtractor:
         self.in_content_cropped_shape = None
 
     def extract(self, in_content):
-        print('prova')
 
         if not isinstance(in_content, np.ndarray):
             raise ValueError('in_content must be of type: ' + str(np.ndarray))
