@@ -154,13 +154,14 @@ class PatchExtractor:
         self.in_content_cropped_shape = None
 
     def extract(self, in_content):
+        print('prova')
 
         if not isinstance(in_content, np.ndarray):
             raise ValueError('in_content must be of type: ' + str(np.ndarray))
 
         if in_content.ndim != self.ndim:
             raise ValueError('in_content shape must a tuple of length {:d}'.format(self.ndim))
-
+        
         self.in_content_original_shape = in_content.shape
 
         # Offset ---
@@ -174,12 +175,14 @@ class PatchExtractor:
             for dim_idx in range(self.ndim):
                 dim_max = (in_content.shape[dim_idx] // self.dim[dim_idx]) * self.dim[dim_idx]
                 in_content_crop = in_content_crop.take(range(0, dim_max), axis=dim_idx)
-            self.in_content_cropped_shape = in_content_crop.shape
             patch_array = view_as_blocks(in_content_crop, self.dim)
         else:
             patch_array = view_as_windows(in_content, self.dim, self.stride)
 
         patch_array = np.ascontiguousarray(patch_array)
+
+        patch_idx = patch_array.shape[:self.ndim]
+        self.in_content_cropped_shape = tuple((np.asarray(patch_idx) - 1) * np.asarray(self.stride) + np.asarray(self.dim))
 
         # Evaluate patch_array or rand sort ---
         if self.rand:
