@@ -224,16 +224,6 @@ class PatchExtractor:
 
         ndim = patch_array.ndim // 2
 
-        # if not isinstance(patch_stride, tuple):
-        #     raise ValueError('patch_stride must be a tuple')
-        # if len(patch_stride) != ndim:
-        #     raise ValueError('patch_stride must be a tuple of length {:d}'.format(ndim))
-        #
-        # if not isinstance(image_shape, tuple):
-        #     raise ValueError('patch_idx must be a tuple')
-        # if len(image_shape) != ndim:
-        #     raise ValueError('patch_idx must be a tuple of length {:d}'.format(ndim))
-
         patch_stride = self.stride
         image_shape = self.in_content_cropped_shape
 
@@ -279,6 +269,7 @@ class PatchExtractor:
 
         image_recon /= norm_mask
 
+        #TODO: output should be same dtype as input
         return image_recon
 
 
@@ -288,13 +279,6 @@ def main():
     stride = (7, 90, 90, 3)
     offset = (1, 0, 0, 0)
     in_content = np.random.randint(256, size=in_shape).astype(np.uint8)
-    # args = {'in_content': in_content,
-    #         'dim': dim,
-    #         'offset': offset,
-    #         'stride': stride,
-    #         }
-
-    # patch_array = patch_extractor_call(args)
     pe = PatchExtractor(dim)
     patch_array = pe.extract(in_content)
     print('patch_array.shape = ' + str(patch_array.shape))
