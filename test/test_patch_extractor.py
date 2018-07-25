@@ -1,9 +1,7 @@
-import os
 import numpy as np
 import unittest
 from PatchExtractor import PatchExtractor, mid_intensity_high_texture, count_patches
 from PIL import Image
-import matplotlib.pyplot as plt
 
 class TestPatchExtractor(unittest.TestCase):
 
@@ -139,6 +137,16 @@ class TestPatchExtractor(unittest.TestCase):
         self.assertEqual(patch.ndim, 1 + im.ndim)
         self.assertEqual(patch.shape[0], len(indexes))
 
+    def test_extract_dtype(self):
+        im = np.load('data/img_4d.npy').astype(np.float)
+
+        patch_shape = (8, 15, 29, 2)
+        patch_stride = (7, 26, 31, 3)
+        pe_str = PatchExtractor(patch_shape, stride=patch_stride)
+        patch_str = pe_str.extract(im)
+
+        self.assertEqual(patch_str.dtype, patch_str.dtype)
+
     def test_mid_intensity_high_texture_threshold(self):
         im = np.asarray(Image.open('data/img_color.png'))
 
@@ -200,22 +208,30 @@ class TestPatchExtractor(unittest.TestCase):
         self.assertTrue(np.allclose(im_recon_str_gt, im_recon_str))
 
     def test_reconstruct_4d(self):
-        # TODO: reduce 4D dimensions
         im = np.load('data/img_4d.npy')
 
         patch_shape = (8, 15, 29, 2)
         pe = PatchExtractor(patch_shape)
         patch = pe.extract(im)
-        im_recon = pe.reconstruct(patch).astype(np.uint8)
+        im_recon = pe.reconstruct(patch)
 
         patch_stride = (7, 26, 31, 3)
         pe_str = PatchExtractor(patch_shape, stride=patch_stride)
         patch_str = pe_str.extract(im)
-        im_recon_str = pe_str.reconstruct(patch_str).astype(np.uint8)
+        im_recon_str = pe_str.reconstruct(patch_str)
 
         im_recon_gt = np.load('data/img_4d_recon_8_15_29_2.npy')
         im_recon_str_gt = np.load('data/img_4d_recon_8_15_29_2_str_7_26_31_1.npy')
         self.assertTrue(np.allclose(im_recon_gt, im_recon))
         self.assertTrue(np.allclose(im_recon_str_gt, im_recon_str, equal_nan=True))
 
+    def test_reconstruct_dtype(self):
+        im = np.load('data/img_4d.npy').astype(np.float)
 
+        patch_shape = (8, 15, 29, 2)
+        patch_stride = (7, 26, 31, 3)
+        pe_str = PatchExtractor(patch_shape, stride=patch_stride)
+        patch_str = pe_str.extract(im)
+        im_recon_str = pe_str.reconstruct(patch_str)
+
+        self.assertEqual(patch_str.dtype, im_recon_str.dtype)
