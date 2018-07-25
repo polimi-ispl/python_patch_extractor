@@ -269,8 +269,7 @@ class PatchExtractor:
 
         image_recon /= norm_mask
 
-        #TODO: output should be same dtype as input
-        return image_recon
+        return image_recon.astype(patch_array.dtype)
 
 
 def main():
