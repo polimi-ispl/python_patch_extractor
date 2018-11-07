@@ -49,6 +49,11 @@ def count_patches(in_size, patch_size, patch_stride):
     return int(np.prod(win_indices_shape))
 
 
+def patch_array_shape(in_size, patch_size, patch_stride):
+    win_indices_shape = ((np.array(in_size) - np.array(patch_size)) // np.array(patch_stride)) + 1
+    return tuple(win_indices_shape) + patch_size
+
+
 class PatchExtractor:
 
     def __init__(self, dim, offset=None, stride=None, rand=None, function=None, threshold=None,
@@ -152,6 +157,7 @@ class PatchExtractor:
 
         self.in_content_original_shape = None
         self.in_content_cropped_shape = None
+        self.patch_array_shape = None
 
     def extract(self, in_content):
 
@@ -203,6 +209,8 @@ class PatchExtractor:
         if self.indexes is not None:
             patch_array.shape = (-1,) + self.dim
             patch_array = patch_array[self.indexes]
+
+        self.patch_array_shape = patch_array.shape
 
         return patch_array
 
@@ -275,8 +283,8 @@ class PatchExtractor:
 def main():
     in_shape = (644, 481, 3)
     dim = (120, 120, 3)
-    stride = (7, 90, 90, 3)
-    offset = (1, 0, 0, 0)
+    stride = (7, 90, 3)
+    offset = (1, 0, 0)
     in_content = np.random.randint(256, size=in_shape).astype(np.uint8)
     pe = PatchExtractor(dim)
     patch_array = pe.extract(in_content)

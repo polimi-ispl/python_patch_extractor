@@ -1,6 +1,6 @@
 import numpy as np
 import unittest
-from PatchExtractor import PatchExtractor, mid_intensity_high_texture, count_patches
+from PatchExtractor import PatchExtractor, mid_intensity_high_texture, count_patches, patch_array_shape
 from PIL import Image
 
 class TestPatchExtractor(unittest.TestCase):
@@ -235,3 +235,14 @@ class TestPatchExtractor(unittest.TestCase):
         im_recon_str = pe_str.reconstruct(patch_str)
 
         self.assertEqual(patch_str.dtype, im_recon_str.dtype)
+
+    def test_patch_array_shape(self):
+        im = np.asarray(Image.open('data/img_color.png'))
+
+        patch_shape = (15, 29, 1)
+        patch_stride = (34, 5, 2)
+
+        pe = PatchExtractor(patch_shape, stride=patch_stride)
+        patch = pe.extract(im)
+
+        self.assertEqual(patch_array_shape(im.shape, patch_shape, patch_stride), patch.shape)
