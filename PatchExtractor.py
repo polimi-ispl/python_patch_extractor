@@ -8,8 +8,6 @@ import numpy as np
 from skimage.util import view_as_windows, view_as_blocks
 
 
-# Tapering window
-
 def taper3d(nt, nmask, ntap, tapertype='hanning'):
     r"""3D taper
     Create 2d mask of size :math:`[n_{mask}[0] \times n_{mask}[1] \times n_t]`
@@ -160,7 +158,7 @@ def patch_array_shape(in_size, patch_size, patch_stride):
 class PatchExtractor:
 
     def __init__(self, dim, offset=None, stride=None, rand=None, function=None, threshold=None,
-                 num=None, indexes=None):
+                 num=None, indexes=None, tapering='rect'):
 
         """
         N-dimensional patch extractor
@@ -193,6 +191,10 @@ class PatchExtractor:
         :param indexes : list|ndarray
             explicitly return corresponding patch indexes (function_handler or C order used to index patch_array).
             Mutually exclusive with num
+
+        :param tapering : str
+            name of the tapering function to be applied at each patch. For now it works only for 2D patches
+            Default rectangular; hanning, cosine, cosinesquare
 
         :return ndarray: patch_array
             array of patch_array
@@ -261,6 +263,10 @@ class PatchExtractor:
         self.in_content_original_shape = None
         self.in_content_cropped_shape = None
         self.patch_array_shape = None
+        self.tapering = tapering
+        if self.tapering is not 'rect' and self.ndim is not 2:
+            self.tapering = 'rect'
+            print('Tapering function works only for 2D patches. Skipping...')
 
     def extract(self, in_content):
 
@@ -315,6 +321,10 @@ class PatchExtractor:
 
         self.patch_array_shape = patch_array.shape
 
+        if self.tapering is not 'rect':
+            patch_array *= taper3d(1, self.dim,
+                                   tuple(np.array(self.dim) - np.array(self.stride)),
+                                   tapertype=self.tapering).squeeze()
         return patch_array
 
     def extract_call(self, args):  # TODO: verify
@@ -378,7 +388,8 @@ class PatchExtractor:
                 norm_mask[h:h + patch_shape[0]] += 1
                 counter += 1
 
-        image_recon /= norm_mask
+        if self.tapering is 'rect':  # average in the overlapping portion
+            image_recon /= norm_mask
 
         return image_recon.astype(patch_array.dtype)
 
