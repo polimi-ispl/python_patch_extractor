@@ -1,5 +1,7 @@
 # Patch Extractor
 
+[![Build Status](https://travis-ci.org/polimi-ispl/python_patch_extractor.svg?branch=master)](https://travis-ci.org/polimi-ispl/python_patch_extractor)
+
 A simple yet powerful N-dimensional patch extractor, in pure python!
 
 Authors: [Nicolò Bonettini](mailto:nicolo.bonettini@polimi.it), [Luca Bondi](mailto:luca.bondi@polimi.it), [Francesco Picetti](mailto:francesco.picetti@polimi.it)
