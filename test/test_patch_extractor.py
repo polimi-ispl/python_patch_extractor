@@ -1,3 +1,5 @@
+import sys
+sys.path.append('..')
 import numpy as np
 import unittest
 from PatchExtractor import PatchExtractor, mid_intensity_high_texture, count_patches, patch_array_shape

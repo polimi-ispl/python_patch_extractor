@@ -1,0 +1,13 @@
+language: python
+python:
+  - "3.4"
+  - "3.5"
+  - "3.6"
+  - "3.7"
+  - "3.8"
+# dependencies
+install:
+  - pip install numpy scikit-image Pillow
+# command to run tests
+script:
+  - python -m unittest test_patch_extractor.TestPatchExtractor
