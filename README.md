@@ -2,7 +2,7 @@
 
 A simple yet powerful N-dimensional patch extractor, in pure python!
 
-Authors: [Nicolò Bonettini](nicolo.bonettini@polimi.it), [Luca Bondi](mailto:luca.bondi@polimi.it), [Francesco Picetti](francesco.picetti@polimi.it)
+Authors: [Nicolò Bonettini](mailto:nicolo.bonettini@polimi.it), [Luca Bondi](mailto:luca.bondi@polimi.it), [Francesco Picetti](mailto:francesco.picetti@polimi.it)
 
 ## Requirements and Installation
 To use this Patch Extractor, simply clone this repo in your work directory.
@@ -14,12 +14,12 @@ The extractor is built upon `numpy` and `scikit-image` modules.
 ## Usage Instructions
 
 1. First you need to import the extractor class:
-    ```
+    ```python
     from python_patch_extractor import PatchExtractor as PE
     ```
 
 2. Then, instantiate an object:
-    ```
+    ```python
     pe = PE.PatchExtractor(dim=patch_shape)
     ```
     `PatchExtractor` class accepts a number of parameters:
@@ -34,7 +34,7 @@ The extractor is built upon `numpy` and `scikit-image` modules.
      - `tapering`: str - tapering function applied to the overlapping portion; must be rect, hanning, cosine, cosinesquare [`rect`]. For now it works only for 2D patches.
 
 3. Once you have your data vector (e.g., an image), you can extract patches via:
-    ```
+    ```python
     patches = pe.extract(data)
     ```
    `patches` will have a shape that is a tuple made by two contributions:
@@ -48,7 +48,7 @@ The extractor is built upon `numpy` and `scikit-image` modules.
    You can get the number of the extracted patches by using `PE.count_patches(in_size, patch_shape, patch_stride)`.
    
 4. If you need to reconstruct the whole data from the patches, you can use:
-    ```
+    ```python
     assembled_data = pe.reconstruct(patches)
     ```
    For now it works for data with up to 4 dimensions.
