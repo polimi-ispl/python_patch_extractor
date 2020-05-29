@@ -5,6 +5,7 @@ import unittest
 from PatchExtractor import PatchExtractor, mid_intensity_high_texture, count_patches, patch_array_shape
 from PIL import Image
 
+
 class TestPatchExtractor(unittest.TestCase):
 
     def test_init_with_rand(self):
@@ -248,3 +249,15 @@ class TestPatchExtractor(unittest.TestCase):
         patch = pe.extract(im)
 
         self.assertEqual(patch_array_shape(im.shape, patch_shape, patch_stride), patch.shape)
+    
+    def test_padding(self):
+        im = np.random.rand(101, 101)
+        patch_shape = (128, 128)
+        
+        pe = PatchExtractor(patch_shape, padding='linear_ramp')
+        
+        patch = pe.extract(im)
+        
+        im_rec = pe.crop_padding(patch, im.shape)
+        
+        self.assertTrue(np.allclose(im_rec, im))

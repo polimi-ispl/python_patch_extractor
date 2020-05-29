@@ -158,7 +158,7 @@ def patch_array_shape(in_size, patch_size, patch_stride):
 class PatchExtractor:
 
     def __init__(self, dim, offset=None, stride=None, rand=None, function=None, threshold=None,
-                 num=None, indexes=None, tapering='rect'):
+                 num=None, indexes=None, tapering='rect', padding=None):
 
         """
         N-dimensional patch extractor
@@ -195,7 +195,11 @@ class PatchExtractor:
         :param tapering : str
             name of the tapering function to be applied at each patch. For now it works only for 2D patches
             Default rectangular; hanning, cosine, cosinesquare
-
+            
+        :param padding : str
+            padding function to apply if the patch dimension is bigger than the in_content.
+            Check numpy.pad for usage instructions.
+            
         :return ndarray: patch_array
             array of patch_array
             if rand==False and function_handler==None and num==None and indexes==None:
@@ -267,7 +271,25 @@ class PatchExtractor:
         if self.tapering is not 'rect' and self.ndim is not 2:
             self.tapering = 'rect'
             print('Tapering function works only for 2D patches. Skipping...')
-
+        
+        self.padding = padding
+    
+    def _compute_padding(self, in_content_shape):
+        points_to_be_added = [self.dim[_] - in_content_shape[_] for _ in range(self.ndim)]
+        pad_width = []
+        for d in range(self.ndim):
+            num_points = points_to_be_added[d]
+            half_pad = num_points // 2
+            pad_width.append((half_pad, num_points - half_pad))
+        return pad_width
+    
+    def crop_padding(self, patch_array, in_content_shape):
+        pad_width = self._compute_padding(in_content_shape)
+        for dim_idx in range(self.ndim):
+            patch_array = patch_array.take(range(pad_width[dim_idx][0], self.dim[dim_idx]-pad_width[dim_idx][1]),
+                                           axis=dim_idx+self.ndim)
+        return patch_array.squeeze()
+    
     def extract(self, in_content):
 
         if not isinstance(in_content, np.ndarray):
@@ -277,7 +299,12 @@ class PatchExtractor:
             raise ValueError('in_content shape must a tuple of length {:d}'.format(self.ndim))
 
         self.in_content_original_shape = in_content.shape
-
+        
+        # Padding ---
+        if self.padding is not None and self.in_content_original_shape < self.dim:
+            pad_width = self._compute_padding(self.in_content_original_shape)
+            in_content = np.pad(in_content, pad_width, mode=self.padding)
+        
         # Offset ---
         for dim_idx, dim_offset in enumerate(self.offset):
             dim_max = in_content.shape[dim_idx]
