@@ -8,7 +8,7 @@ import numpy as np
 from skimage.util import view_as_windows, view_as_blocks
 
 
-def taper3d(nt, nmask, ntap, tapertype='hanning'):
+def _taper3d(nt, nmask, ntap, tapertype='hanning'):
     r"""3D taper
     Create 2d mask of size :math:`[n_{mask}[0] \times n_{mask}[1] \times n_t]`
     with tapering of size ``ntap`` along the first and second dimension
@@ -34,14 +34,14 @@ def taper3d(nt, nmask, ntap, tapertype='hanning'):
 
     # create 1d window
     if tapertype == 'hanning':
-        tpr_y = hanningtaper(nmasky, ntapy)
-        tpr_x = hanningtaper(nmaskx, ntapx)
+        tpr_y = _hanningtaper(nmasky, ntapy)
+        tpr_x = _hanningtaper(nmaskx, ntapx)
     elif tapertype == 'cosine':
-        tpr_y = cosinetaper(nmasky, ntapy, False)
-        tpr_x = cosinetaper(nmaskx, ntapx, False)
+        tpr_y = _cosinetaper(nmasky, ntapy, False)
+        tpr_x = _cosinetaper(nmaskx, ntapx, False)
     elif tapertype == 'cosinesquare':
-        tpr_y = cosinetaper(nmasky, ntapy, True)
-        tpr_x = cosinetaper(nmaskx, ntapx, True)
+        tpr_y = _cosinetaper(nmasky, ntapy, True)
+        tpr_x = _cosinetaper(nmaskx, ntapx, True)
     else:
         tpr_y = np.ones(nmasky)
         tpr_x = np.ones(nmaskx)
@@ -54,7 +54,7 @@ def taper3d(nt, nmask, ntap, tapertype='hanning'):
     return tpr_3d
 
 
-def hanningtaper(nmask, ntap):
+def _hanningtaper(nmask, ntap):
     r"""1D Hanning taper
     Create unitary mask of length ``nmask`` with Hanning tapering
     at edges of size ``ntap``
@@ -82,7 +82,7 @@ def hanningtaper(nmask, ntap):
     return tpr_1d
 
 
-def cosinetaper(nmask, ntap, square=False):
+def _cosinetaper(nmask, ntap, square=False):
     r"""1D Cosine or Cosine square taper
     Create unitary mask of length ``nmask`` with Hanning tapering
     at edges of size ``ntap``
@@ -137,22 +137,52 @@ def mid_intensity_high_texture(in_content):
     return score
 
 
-def count_patches(in_size, patch_size, patch_stride):
-    """
-    Compute the number of patches
-    :param in_size:
-    :param patch_size:
-    :param patch_stride:
-    :return:
-    """
-    win_indices_shape = (((np.array(in_size) - np.array(patch_size))
-                          // np.array(patch_stride)) + 1)
-    return int(np.prod(win_indices_shape))
+def win_indices_shape(in_shape, patch_shape, patch_stride):
+    return ((np.array(in_shape) - np.array(patch_shape)) // np.array(patch_stride)) + 1
 
 
-def patch_array_shape(in_size, patch_size, patch_stride):
-    win_indices_shape = ((np.array(in_size) - np.array(patch_size)) // np.array(patch_stride)) + 1
-    return tuple(win_indices_shape) + patch_size
+def count_patches(in_shape, patch_shape, patch_stride):
+    return int(np.prod(win_indices_shape(in_shape, patch_shape, patch_stride)))
+
+
+def patch_array_shape(in_shape, patch_shape, patch_stride):
+    return tuple(win_indices_shape(in_shape, patch_shape, patch_stride)) + patch_shape
+
+
+def compute_cropped_shape(in_shape, patch_shape, patch_stride):
+    w = win_indices_shape(in_shape, patch_shape, patch_stride)
+    return tuple(w * np.array(patch_stride) + np.array(patch_shape))
+
+
+def compute_patch_padding(in_shape, patch_shape, patch_stride):
+    """Pad the patch if self.dim > in_content.shape with in_content centered in the patch"""
+    assert len(in_shape) == len(patch_shape)
+    ndim = len(in_shape)
+    points_to_be_added = [patch_shape[_] - in_shape[_] for _ in range(ndim)]
+    pad_width = []
+    for d in range(ndim):
+        num_points = points_to_be_added[d]
+        half_pad = num_points // 2
+        pad_width.append((half_pad, num_points - half_pad))
+    return pad_width
+
+
+def compute_input_padding(in_shape, patch_shape, patch_stride):
+    """Pad the in_content array to avoid data loss"""
+    diff_shape = np.array(compute_cropped_shape(in_shape, patch_shape, patch_stride)) \
+                 - np.array(in_shape)
+    pad_width = [(0, n) for n in diff_shape]
+    return pad_width
+
+
+def crop_padding(in_content, pad_width):
+    assert len(in_content.shape) == len(pad_width)
+    ndim = len(in_content.shape)
+    
+    for dim_idx in range(ndim):
+        in_content = in_content.take(range(pad_width[dim_idx][0], in_content.shape[dim_idx] - pad_width[dim_idx][1]),
+                                     axis=dim_idx)
+    return in_content.squeeze()
 
 
 class PatchExtractor:
@@ -273,23 +303,8 @@ class PatchExtractor:
             print('Tapering function works only for 2D patches. Skipping...')
         
         self.padding = padding
-    
-    def _compute_padding(self, in_content_shape):
-        points_to_be_added = [self.dim[_] - in_content_shape[_] for _ in range(self.ndim)]
-        pad_width = []
-        for d in range(self.ndim):
-            num_points = points_to_be_added[d]
-            half_pad = num_points // 2
-            pad_width.append((half_pad, num_points - half_pad))
-        return pad_width
-    
-    def crop_padding(self, patch_array, in_content_shape):
-        pad_width = self._compute_padding(in_content_shape)
-        for dim_idx in range(self.ndim):
-            patch_array = patch_array.take(range(pad_width[dim_idx][0], self.dim[dim_idx]-pad_width[dim_idx][1]),
-                                           axis=dim_idx+self.ndim)
-        return patch_array.squeeze()
-    
+        self.pad_width = None
+       
     def extract(self, in_content):
 
         if not isinstance(in_content, np.ndarray):
@@ -301,10 +316,16 @@ class PatchExtractor:
         self.in_content_original_shape = in_content.shape
         
         # Padding ---
-        if self.padding is not None and self.in_content_original_shape < self.dim:
-            pad_width = self._compute_padding(self.in_content_original_shape)
-            in_content = np.pad(in_content, pad_width, mode=self.padding)
-        
+        if self.padding is not None:
+            if self.in_content_original_shape < self.dim:
+                # the patch is bigger than in_content
+                self.pad_width = compute_patch_padding(self.in_content_original_shape, self.dim, self.stride)
+            else:
+                # pad in_content at the axes ends to avoid data loss
+                self.pad_width = compute_input_padding(self.in_content_original_shape, self.dim, self.stride)
+            
+            in_content = np.pad(in_content, self.pad_width, mode=self.padding)
+
         # Offset ---
         for dim_idx, dim_offset in enumerate(self.offset):
             dim_max = in_content.shape[dim_idx]
@@ -349,9 +370,9 @@ class PatchExtractor:
         self.patch_array_shape = patch_array.shape
 
         if self.tapering is not 'rect':
-            patch_array *= taper3d(1, self.dim,
-                                   tuple(np.array(self.dim) - np.array(self.stride)),
-                                   tapertype=self.tapering).squeeze()
+            patch_array *= _taper3d(1, self.dim,
+                                    tuple(np.array(self.dim) - np.array(self.stride)),
+                                    tapertype=self.tapering).squeeze()
         return patch_array
 
     def extract_call(self, args):  # TODO: verify
@@ -417,8 +438,13 @@ class PatchExtractor:
 
         if self.tapering is 'rect':  # average in the overlapping portion
             image_recon /= norm_mask
-
-        return image_recon.astype(patch_array.dtype)
+        
+        image_recon = image_recon.astype(patch_array.dtype)
+        
+        if self.pad_width is not None:
+            image_recon = crop_padding(image_recon, self.pad_width)
+            
+        return image_recon
 
 
 def main():
@@ -433,6 +459,11 @@ def main():
     img_recon = pe.reconstruct(patch_array)
     print('img_recon.shape = ' + str(img_recon.shape))
 
+    # test padding
+    in_content = np.ones((751, 2001))
+    pe = PatchExtractor((512,512), padding="constant")
+    print(0)
+ 
 
 if __name__ == "__main__":
     main()

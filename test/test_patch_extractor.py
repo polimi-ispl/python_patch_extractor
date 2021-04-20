@@ -250,7 +250,7 @@ class TestPatchExtractor(unittest.TestCase):
 
         self.assertEqual(patch_array_shape(im.shape, patch_shape, patch_stride), patch.shape)
     
-    def test_padding(self):
+    def test_padding_patch(self):
         im = np.random.rand(101, 101)
         patch_shape = (128, 128)
         
@@ -258,6 +258,18 @@ class TestPatchExtractor(unittest.TestCase):
         
         patch = pe.extract(im)
         
-        im_rec = pe.crop_padding(patch, im.shape)
+        im_rec = pe.reconstruct(patch)
         
+        self.assertTrue(np.allclose(im_rec, im))
+    
+    def test_padding_input(self):
+        im = np.random.rand(141, 141)
+        patch_shape = (128, 128)
+    
+        pe = PatchExtractor(patch_shape, padding='constant')
+    
+        patch = pe.extract(im)
+    
+        im_rec = pe.reconstruct(patch)
+    
         self.assertTrue(np.allclose(im_rec, im))
