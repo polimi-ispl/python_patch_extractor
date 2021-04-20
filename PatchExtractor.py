@@ -193,9 +193,7 @@ class PatchExtractor:
         """
         N-dimensional patch extractor
         Args:
-        :param in_content : ndarray
-            the content to process as a numpy array of ndim dimensions
-
+        
         :param dim : tuple
             patch_array dimensions as a tuple of ndim elements
 
@@ -227,8 +225,9 @@ class PatchExtractor:
             Default rectangular; hanning, cosine, cosinesquare
             
         :param padding : str
-            padding function to apply if the patch dimension is bigger than the in_content.
-            Check numpy.pad for usage instructions.
+            padding function to apply; check numpy.pad for usage instructions.
+            If the patch dimension is bigger than the in_content, is a symmetric padding.
+            If the patch dimension is smaller than the in_content, it adds values to the axes ends to avoid data losses.
             
         :return ndarray: patch_array
             array of patch_array

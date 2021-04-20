@@ -34,6 +34,7 @@ The extractor is built upon `numpy` and `scikit-image` modules.
      - `num`: int - number of extracted patches to return [None]. It is concurrent with `indexes` argument.
      - `indexes`: list or 1D array - indexes of the extracted patches to return [None]. It is concurrent with `num` argument.
      - `tapering`: str - tapering function applied to the overlapping portion; must be rect, hanning, cosine, cosinesquare [`rect`]. For now it works only for 2D patches.
+     - `padding`: str - padding strategy (taken from np.pad). If the patch is bigger than the input, the original content is centered in the resulting patch. If the patch is smaller than the input, it adds some samples at the end of each axis in order to keep all the available data. 
 
 3. Once you have your data vector (e.g., an image), you can extract patches via:
     ```python
