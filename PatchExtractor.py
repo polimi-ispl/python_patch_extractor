@@ -297,7 +297,7 @@ class PatchExtractor:
         self.in_content_cropped_shape = None
         self.patch_array_shape = None
         self.tapering = tapering
-        if self.tapering is not 'rect' and self.ndim is not 2:
+        if self.tapering != 'rect' and self.ndim != 2:
             self.tapering = 'rect'
             print('Tapering function works only for 2D patches. Skipping...')
         
@@ -368,7 +368,7 @@ class PatchExtractor:
 
         self.patch_array_shape = patch_array.shape
 
-        if self.tapering is not 'rect':
+        if self.tapering != 'rect':
             patch_array *= _taper3d(1, self.dim,
                                     tuple(np.array(self.dim) - np.array(self.stride)),
                                     tapertype=self.tapering).squeeze()
