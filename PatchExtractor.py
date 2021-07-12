@@ -326,32 +326,44 @@ class PatchExtractor:
             in_content = np.pad(in_content, self.pad_width, mode=self.padding)
 
         # Offset ---
-        for dim_idx, dim_offset in enumerate(self.offset):
-            dim_max = in_content.shape[dim_idx]
-            in_content = in_content.take(range(dim_offset, dim_max), axis=dim_idx)
-
+        if self.offset != (0,)*len(self.offset):  # not necessary but it avoids some operations
+            for dim_idx, dim_offset in enumerate(self.offset):
+                if dim_idx != 0:
+                    in_content = in_content.swapaxes(dim_idx, 0)
+                in_content = in_content[dim_offset:]
+                if dim_idx != 0:
+                    in_content = in_content.swapaxes(dim_idx, 0)
+        
         # Patch list ---
         if self.dim == self.stride:
             in_content_crop = in_content
             for dim_idx in range(self.ndim):
                 dim_max = (in_content.shape[dim_idx] // self.dim[dim_idx]) * self.dim[dim_idx]
-                in_content_crop = in_content_crop.take(range(0, dim_max), axis=dim_idx)
+                if dim_idx != 0:
+                    in_content_crop = in_content_crop.swapaxes(dim_idx, 0)
+                in_content_crop = in_content_crop[:dim_max]
+                if dim_idx != 0:
+                    in_content_crop = in_content_crop.swapaxes(dim_idx, 0)
+                
             patch_array = view_as_blocks(in_content_crop, self.dim)
         else:
             patch_array = view_as_windows(in_content, self.dim, self.stride)
-
-        patch_array = np.ascontiguousarray(patch_array)
-
+        
+        if isinstance(in_content, np.memmap):
+            pass
+        else:
+            patch_array = np.ascontiguousarray(patch_array)
+            
         patch_idx = patch_array.shape[:self.ndim]
         self.in_content_cropped_shape = tuple((np.asarray(patch_idx) - 1) * np.asarray(self.stride) + np.asarray(self.dim))
 
         # Evaluate patch_array or rand sort ---
         if self.rand:
-            patch_array.shape = (-1,) + self.dim
+            patch_array = patch_array.reshape((-1,) + self.dim)
             random.shuffle(patch_array)
         else:
             if self.function_handler is not None:
-                patch_array.shape = (-1,) + self.dim
+                patch_array = patch_array.reshape((-1,) + self.dim)
                 patch_scores = np.asarray(list(map(self.function_handler, patch_array)))
                 sort_idxs = np.argsort(patch_scores)[::-1]
                 patch_scores = patch_scores[sort_idxs]
@@ -359,12 +371,10 @@ class PatchExtractor:
                 patch_array = patch_array[patch_scores >= self.threshold]
 
         if self.num is not None:
-            patch_array.shape = (-1,) + self.dim
-            patch_array = patch_array[:self.num]
+            patch_array = patch_array.reshape((-1,) + self.dim)[:self.num]
 
         if self.indexes is not None:
-            patch_array.shape = (-1,) + self.dim
-            patch_array = patch_array[self.indexes]
+            patch_array = patch_array.reshape((-1,) + self.dim)[self.indexes]
 
         self.patch_array_shape = patch_array.shape
 
@@ -435,7 +445,7 @@ class PatchExtractor:
                 norm_mask[h:h + patch_shape[0]] += 1
                 counter += 1
 
-        if self.tapering is 'rect':  # average in the overlapping portion
+        if self.tapering == 'rect':  # average in the overlapping portion
             image_recon /= norm_mask
         
         image_recon = image_recon.astype(patch_array.dtype)
@@ -452,15 +462,19 @@ def main():
     stride = (7, 90, 3)
     offset = (1, 0, 0)
     in_content = np.random.randint(256, size=in_shape).astype(np.uint8)
-    pe = PatchExtractor(dim)
+    pe = PatchExtractor(dim, stride=stride, offset=offset)
     patch_array = pe.extract(in_content)
     print('patch_array.shape = ' + str(patch_array.shape))
     img_recon = pe.reconstruct(patch_array)
     print('img_recon.shape = ' + str(img_recon.shape))
 
     # test padding
-    in_content = np.ones((751, 2001))
-    pe = PatchExtractor((512,512), padding="constant")
+    in_content = np.ones((100, 100))
+    pe = PatchExtractor((64, 64), padding="constant")
+    patch_array = pe.extract(in_content)
+    print('patch_array.shape = ' + str(patch_array.shape))
+    img_recon = pe.reconstruct(patch_array)
+    print('img_recon.shape = ' + str(img_recon.shape))
     print(0)
  
 
